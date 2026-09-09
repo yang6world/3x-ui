@@ -5,6 +5,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/mhsanaei/3x-ui/v3/internal/config"
 	"github.com/mhsanaei/3x-ui/v3/internal/logger"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/middleware"
 	"github.com/mhsanaei/3x-ui/v3/internal/web/service"
@@ -29,11 +30,13 @@ type IndexController struct {
 	settingService service.SettingService
 	userService    panel.UserService
 	tgbot          tgbot.Tgbot
+	authConfig     config.AuthConfig
+	oidcProviders  oidcProviderCache
 }
 
 // NewIndexController creates a new IndexController and initializes its routes.
-func NewIndexController(g *gin.RouterGroup) *IndexController {
-	a := &IndexController{}
+func NewIndexController(g *gin.RouterGroup, authConfig config.AuthConfig) *IndexController {
+	a := &IndexController{authConfig: authConfig}
 	a.initRouter(g)
 	return a
 }
@@ -44,6 +47,8 @@ func (a *IndexController) initRouter(g *gin.RouterGroup) {
 	g.GET("/csrf-token", a.csrfToken)
 
 	g.POST("/login", middleware.CSRFMiddleware(), a.login)
+	g.GET("/oidc/login", a.oidcLogin)
+	g.GET("/oidc/callback", a.oidcCallback)
 	g.POST("/logout", middleware.CSRFMiddleware(), a.logout)
 	g.POST("/getTwoFactorEnable", middleware.CSRFMiddleware(), a.getTwoFactorEnable)
 }
@@ -60,6 +65,11 @@ func (a *IndexController) index(c *gin.Context) {
 
 // login handles user authentication and session creation.
 func (a *IndexController) login(c *gin.Context) {
+	if !a.authConfig.PasswordLoginEnabled {
+		pureJsonMsg(c, http.StatusForbidden, false, "Password login is disabled.")
+		return
+	}
+
 	var form LoginForm
 
 	if err := c.ShouldBind(&form); err != nil {

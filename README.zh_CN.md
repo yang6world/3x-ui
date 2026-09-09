@@ -159,6 +159,15 @@ docker run -d --cap-add=NET_ADMIN --cap-add=NET_RAW ... ghcr.io/mhsanaei/3x-ui
 | `XUI_DB_MAX_IDLE_CONNS` | 最大空闲连接数（PostgreSQL 连接池） | — |
 | `XUI_INIT_WEB_BASE_PATH` | Web 面板的初始 URI 路径 | `/` |
 | `XUI_ENABLE_FAIL2BAN` | 启用基于 Fail2ban 的 IP 限制 | `true` |
+| `XUI_OIDC_ENABLED` | 启用 OpenID Connect 登录 | `false` |
+| `XUI_OIDC_ISSUER_URL` | 用于自动发现配置的 OIDC 颁发者地址 | — |
+| `XUI_OIDC_CLIENT_ID` | OIDC 客户端 ID | — |
+| `XUI_OIDC_CLIENT_SECRET` | OIDC 客户端密钥（公共客户端可留空） | — |
+| `XUI_OIDC_REDIRECT_URL` | 在身份提供商处登记的绝对回调地址；路径为 `<Web 基础路径>/oidc/callback` | — |
+| `XUI_OIDC_PROVIDER_NAME` | 登录按钮上显示的身份提供商名称 | `OpenID Connect` |
+| `XUI_OIDC_SCOPES` | 空格或逗号分隔的 OIDC scope（始终包含 `openid`） | `openid profile email` |
+| `XUI_OIDC_ALLOWED_EMAILS` | 可选的管理员邮箱白名单，以逗号分隔；留空则允许身份提供商接受的所有身份 | — |
+| `XUI_PASSWORD_LOGIN_ENABLED` | 是否允许本地/LDAP 用户名密码登录；仅在 OIDC 已启用且配置完整时可设为 `false` | `true` |
 | `XUI_LOG_LEVEL` | 日志级别（`debug`、`info`、`warning`、`error`） | `info` |
 | `XUI_DEBUG` | 启用调试模式 | `false` |
 | `XUI_TUNNEL_HEALTH_MONITOR` | 启用隧道健康监控（探测某个 URL，在连续多次失败后重启 xray；重启会断开所有客户端） | `false` |

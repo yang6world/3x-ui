@@ -133,6 +133,13 @@ func serveDistPage(c *gin.Context, name string) {
 		nonceAttr = ` nonce="` + htmlpkg.EscapeString(nonce) + `"`
 	}
 	script := `<script data-cfasync="false"` + nonceAttr + `>window.X_UI_BASE_PATH="` + escapedBase + `"`
+	if name == "login.html" {
+		if authConfig, authErr := config.GetAuthConfig(); authErr == nil {
+			if publicJSON, marshalErr := json.Marshal(authConfig.Public()); marshalErr == nil {
+				script += `;window.X_UI_AUTH_CONFIG=` + string(publicJSON)
+			}
+		}
+	}
 	if name != "login.html" {
 		escapedVer := jsEscape.Replace(config.GetPanelVersion())
 		script += `;window.X_UI_CUR_VER="` + escapedVer + `"`

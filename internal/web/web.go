@@ -193,6 +193,10 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	authConfig, err := config.GetAuthConfig()
+	if err != nil {
+		return nil, fmt.Errorf("authentication configuration: %w", err)
+	}
 	engine.Use(gzip.Gzip(gzip.DefaultCompression))
 	assetsBasePath := basePath + "assets/"
 
@@ -250,7 +254,7 @@ func (s *Server) initRouter() (*gin.Engine, error) {
 	g.GET("/service-worker.js", controller.ServePWAServiceWorker)
 	g.GET("/icons/:name", controller.ServePWAIcon)
 
-	s.index = controller.NewIndexController(g)
+	s.index = controller.NewIndexController(g, authConfig)
 	s.panel = controller.NewXUIController(g)
 	s.api = controller.NewAPIController(g)
 

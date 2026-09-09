@@ -159,6 +159,15 @@ docker run -d --cap-add=NET_ADMIN --cap-add=NET_RAW ... ghcr.io/mhsanaei/3x-ui
 | `XUI_DB_MAX_IDLE_CONNS` | Maximum idle connections (PostgreSQL pool) | — |
 | `XUI_INIT_WEB_BASE_PATH` | The initial URI path for the web panel | `/` |
 | `XUI_ENABLE_FAIL2BAN` | Enable Fail2ban-based IP-limit enforcement | `true` |
+| `XUI_OIDC_ENABLED` | Enable OpenID Connect login | `false` |
+| `XUI_OIDC_ISSUER_URL` | OIDC issuer used for discovery | — |
+| `XUI_OIDC_CLIENT_ID` | OIDC client ID | — |
+| `XUI_OIDC_CLIENT_SECRET` | OIDC client secret (may be empty for a public client) | — |
+| `XUI_OIDC_REDIRECT_URL` | Absolute callback URL registered with the provider; append `<web-base-path>/oidc/callback` | — |
+| `XUI_OIDC_PROVIDER_NAME` | Provider name shown on the login button | `OpenID Connect` |
+| `XUI_OIDC_SCOPES` | Space- or comma-separated OIDC scopes (`openid` is always included) | `openid profile email` |
+| `XUI_OIDC_ALLOWED_EMAILS` | Optional comma-separated administrator email allowlist; empty permits every identity accepted by the provider | — |
+| `XUI_PASSWORD_LOGIN_ENABLED` | Enable local/LDAP username and password login; may be `false` only when OIDC is enabled and completely configured | `true` |
 | `XUI_LOG_LEVEL` | Log verbosity (`debug`, `info`, `warning`, `error`) | `info` |
 | `XUI_DEBUG` | Enable debug mode | `false` |
 | `XUI_TUNNEL_HEALTH_MONITOR` | Enable the tunnel health monitor (probes a URL and restarts xray after repeated failures; a restart drops all clients) | `false` |

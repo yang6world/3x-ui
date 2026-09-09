@@ -1,7 +1,10 @@
 package config
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
+	"slices"
 	"testing"
 )
 
@@ -77,5 +80,99 @@ func TestGetPortOverride(t *testing.T) {
 				t.Errorf("error = %v, wantErr %t", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestGetAuthConfigDefaults(t *testing.T) {
+	clearAuthEnv(t)
+	cfg, err := GetAuthConfig()
+	if err != nil {
+		t.Fatalf("GetAuthConfig: %v", err)
+	}
+	if cfg.OIDCEnabled {
+		t.Fatal("OIDC must be disabled by default")
+	}
+	if !cfg.PasswordLoginEnabled {
+		t.Fatal("password login must remain enabled by default")
+	}
+	if cfg.OIDCProviderName != "OpenID Connect" {
+		t.Fatalf("provider name = %q", cfg.OIDCProviderName)
+	}
+}
+
+func TestGetAuthConfigOIDC(t *testing.T) {
+	clearAuthEnv(t)
+	t.Setenv("XUI_OIDC_ENABLED", "true")
+	t.Setenv("XUI_PASSWORD_LOGIN_ENABLED", "false")
+	t.Setenv("XUI_OIDC_ISSUER_URL", "https://id.example.test/realms/panel")
+	t.Setenv("XUI_OIDC_CLIENT_ID", "panel")
+	t.Setenv("XUI_OIDC_CLIENT_SECRET", "must-not-leak")
+	t.Setenv("XUI_OIDC_REDIRECT_URL", "https://panel.example.test/secret/oidc/callback")
+	t.Setenv("XUI_OIDC_PROVIDER_NAME", "Example SSO")
+	t.Setenv("XUI_OIDC_SCOPES", "profile,email,profile")
+	t.Setenv("XUI_OIDC_ALLOWED_EMAILS", "Admin@example.test, other@example.test")
+
+	cfg, err := GetAuthConfig()
+	if err != nil {
+		t.Fatalf("GetAuthConfig: %v", err)
+	}
+	if !cfg.OIDCEnabled || cfg.PasswordLoginEnabled {
+		t.Fatalf("unexpected auth modes: %#v", cfg.Public())
+	}
+	if !slices.Equal(cfg.OIDCScopes, []string{"openid", "profile", "email"}) {
+		t.Fatalf("scopes = %#v", cfg.OIDCScopes)
+	}
+	if !slices.Equal(cfg.OIDCAllowedEmails, []string{"Admin@example.test", "other@example.test"}) {
+		t.Fatalf("allowed emails = %#v", cfg.OIDCAllowedEmails)
+	}
+	publicJSON, err := json.Marshal(cfg.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(publicJSON, []byte("must-not-leak")) {
+		t.Fatal("public auth config contains the OIDC client secret")
+	}
+}
+
+func TestGetAuthConfigRejectsUnsafeOrIncompleteModes(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+	}{
+		{name: "invalid OIDC boolean", env: map[string]string{"XUI_OIDC_ENABLED": "sometimes"}},
+		{name: "no login method", env: map[string]string{"XUI_PASSWORD_LOGIN_ENABLED": "false"}},
+		{name: "missing issuer", env: map[string]string{"XUI_OIDC_ENABLED": "true"}},
+		{name: "missing client id", env: map[string]string{"XUI_OIDC_ENABLED": "true", "XUI_OIDC_ISSUER_URL": "https://id.example.test"}},
+		{name: "missing redirect URL", env: map[string]string{"XUI_OIDC_ENABLED": "true", "XUI_OIDC_ISSUER_URL": "https://id.example.test", "XUI_OIDC_CLIENT_ID": "panel"}},
+		{name: "relative redirect URL", env: map[string]string{"XUI_OIDC_ENABLED": "true", "XUI_OIDC_ISSUER_URL": "https://id.example.test", "XUI_OIDC_CLIENT_ID": "panel", "XUI_OIDC_REDIRECT_URL": "/oidc/callback"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearAuthEnv(t)
+			for name, value := range tt.env {
+				t.Setenv(name, value)
+			}
+			if _, err := GetAuthConfig(); err == nil {
+				t.Fatal("GetAuthConfig succeeded, want validation error")
+			}
+		})
+	}
+}
+
+func clearAuthEnv(t *testing.T) {
+	t.Helper()
+	for _, name := range []string{
+		"XUI_OIDC_ENABLED",
+		"XUI_PASSWORD_LOGIN_ENABLED",
+		"XUI_OIDC_ISSUER_URL",
+		"XUI_OIDC_CLIENT_ID",
+		"XUI_OIDC_CLIENT_SECRET",
+		"XUI_OIDC_REDIRECT_URL",
+		"XUI_OIDC_PROVIDER_NAME",
+		"XUI_OIDC_SCOPES",
+		"XUI_OIDC_ALLOWED_EMAILS",
+	} {
+		t.Setenv(name, "")
 	}
 }

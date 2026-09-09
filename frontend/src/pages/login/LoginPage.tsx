@@ -17,6 +17,7 @@ import {
   LockOutlined,
   MoonFilled,
   MoonOutlined,
+  SafetyCertificateOutlined,
   SunOutlined,
   TranslationOutlined,
   UserOutlined,
@@ -35,6 +36,11 @@ const HEADLINE_INTERVAL_MS = 2000;
 type LoginForm = LoginFormValues;
 
 const basePath = window.X_UI_BASE_PATH || '';
+const authConfig = window.X_UI_AUTH_CONFIG || {
+  oidcEnabled: false,
+  passwordLoginEnabled: true,
+  oidcProviderName: 'OpenID Connect',
+};
 
 export default function LoginPage() {
   const { t } = useTranslation();
@@ -45,7 +51,15 @@ export default function LoginPage() {
     setMessageInstance(messageApi);
   }, [messageApi]);
 
-  const [fetched, setFetched] = useState(false);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('oidc_error') !== '1') return;
+    messageApi.error(t('somethingWentWrong'));
+    url.searchParams.delete('oidc_error');
+    window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  }, [messageApi, t]);
+
+  const [fetched, setFetched] = useState(!authConfig.passwordLoginEnabled);
   const [submitting, setSubmitting] = useState(false);
   const [twoFactorEnable, setTwoFactorEnable] = useState(false);
   const [headlineIndex, setHeadlineIndex] = useState(0);
@@ -64,6 +78,9 @@ export default function LoginPage() {
   }, [headlineWords.length]);
 
   useEffect(() => {
+    if (!authConfig.passwordLoginEnabled) {
+      return;
+    }
     let cancelled = false;
     (async () => {
       const msg = await HttpUtil.post('/getTwoFactorEnable');
@@ -186,67 +203,84 @@ export default function LoginPage() {
                   <b key={headlineIndex}>{headlineWords[headlineIndex]}</b>
                 </h2>
 
-                <FormProvider {...methods}>
-                  <Form
-                    layout="vertical"
-                    className="login-form"
-                    onFinish={methods.handleSubmit(onSubmit)}
+                {authConfig.oidcEnabled && (
+                  <Button
+                    type="primary"
+                    size="large"
+                    block
+                    className={
+                      authConfig.passwordLoginEnabled ? 'oidc-login' : 'oidc-login oidc-login-only'
+                    }
+                    icon={<SafetyCertificateOutlined />}
+                    href={`${basePath}oidc/login`}
                   >
-                    <FormField
-                      name="username"
-                      label={t('username')}
-                      rules={{ validate: rhfZodValidate(LoginFormSchema.shape.username) }}
-                    >
-                      <Input
-                        prefix={<UserOutlined />}
-                        autoComplete="username"
-                        size="large"
-                        placeholder={t('username')}
-                        autoFocus
-                      />
-                    </FormField>
+                    {t('login')} · {authConfig.oidcProviderName}
+                  </Button>
+                )}
 
-                    <FormField
-                      name="password"
-                      label={t('password')}
-                      rules={{ validate: rhfZodValidate(LoginFormSchema.shape.password) }}
+                {authConfig.passwordLoginEnabled && (
+                  <FormProvider {...methods}>
+                    <Form
+                      layout="vertical"
+                      className="login-form"
+                      onFinish={methods.handleSubmit(onSubmit)}
                     >
-                      <Input.Password
-                        prefix={<LockOutlined />}
-                        autoComplete="current-password"
-                        size="large"
-                        placeholder={t('password')}
-                      />
-                    </FormField>
-
-                    {twoFactorEnable && (
                       <FormField
-                        name="twoFactorCode"
-                        label={t('twoFactorCode')}
-                        rules={{ validate: rhfZodValidate(TwoFactorCodeSchema) }}
+                        name="username"
+                        label={t('username')}
+                        rules={{ validate: rhfZodValidate(LoginFormSchema.shape.username) }}
                       >
                         <Input
-                          prefix={<KeyOutlined />}
-                          autoComplete="one-time-code"
+                          prefix={<UserOutlined />}
+                          autoComplete="username"
                           size="large"
-                          placeholder={t('twoFactorCode')}
+                          placeholder={t('username')}
+                          autoFocus={!authConfig.oidcEnabled}
                         />
                       </FormField>
-                    )}
 
-                    <Form.Item className="submit-row">
-                      <Button
-                        type="primary"
-                        htmlType="submit"
-                        loading={submitting}
-                        size="large"
-                        block
+                      <FormField
+                        name="password"
+                        label={t('password')}
+                        rules={{ validate: rhfZodValidate(LoginFormSchema.shape.password) }}
                       >
-                        {t('login')}
-                      </Button>
-                    </Form.Item>
-                  </Form>
-                </FormProvider>
+                        <Input.Password
+                          prefix={<LockOutlined />}
+                          autoComplete="current-password"
+                          size="large"
+                          placeholder={t('password')}
+                        />
+                      </FormField>
+
+                      {twoFactorEnable && (
+                        <FormField
+                          name="twoFactorCode"
+                          label={t('twoFactorCode')}
+                          rules={{ validate: rhfZodValidate(TwoFactorCodeSchema) }}
+                        >
+                          <Input
+                            prefix={<KeyOutlined />}
+                            autoComplete="one-time-code"
+                            size="large"
+                            placeholder={t('twoFactorCode')}
+                          />
+                        </FormField>
+                      )}
+
+                      <Form.Item className="submit-row">
+                        <Button
+                          type="primary"
+                          htmlType="submit"
+                          loading={submitting}
+                          size="large"
+                          block
+                        >
+                          {t('login')}
+                        </Button>
+                      </Form.Item>
+                    </Form>
+                  </FormProvider>
+                )}
               </div>
             )}
           </div>

@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -107,6 +108,134 @@ func IsDebug() bool {
 // IsSkipHSTS returns true if skipping HSTS mode is enabled via the XUI_SKIP_HSTS environment variable.
 func IsSkipHSTS() bool {
 	return os.Getenv("XUI_SKIP_HSTS") == "true"
+}
+
+// AuthConfig contains the environment-backed authentication settings. Secrets
+// in this struct must never be serialized into a response or injected into a
+// page; use PublicAuthConfig for browser-facing configuration.
+type AuthConfig struct {
+	OIDCEnabled          bool
+	PasswordLoginEnabled bool
+	OIDCIssuerURL        string
+	OIDCClientID         string
+	OIDCClientSecret     string
+	OIDCRedirectURL      string
+	OIDCProviderName     string
+	OIDCScopes           []string
+	OIDCAllowedEmails    []string
+}
+
+// PublicAuthConfig is the non-sensitive subset exposed to the login page.
+type PublicAuthConfig struct {
+	OIDCEnabled          bool   `json:"oidcEnabled"`
+	PasswordLoginEnabled bool   `json:"passwordLoginEnabled"`
+	OIDCProviderName     string `json:"oidcProviderName"`
+}
+
+// GetAuthConfig parses and validates the panel authentication environment.
+// Password login remains enabled by default for backwards compatibility.
+func GetAuthConfig() (AuthConfig, error) {
+	oidcEnabled, err := envBool("XUI_OIDC_ENABLED", false)
+	if err != nil {
+		return AuthConfig{}, err
+	}
+	passwordEnabled, err := envBool("XUI_PASSWORD_LOGIN_ENABLED", true)
+	if err != nil {
+		return AuthConfig{}, err
+	}
+
+	cfg := AuthConfig{
+		OIDCEnabled:          oidcEnabled,
+		PasswordLoginEnabled: passwordEnabled,
+		OIDCIssuerURL:        strings.TrimSpace(os.Getenv("XUI_OIDC_ISSUER_URL")),
+		OIDCClientID:         strings.TrimSpace(os.Getenv("XUI_OIDC_CLIENT_ID")),
+		OIDCClientSecret:     os.Getenv("XUI_OIDC_CLIENT_SECRET"),
+		OIDCRedirectURL:      strings.TrimSpace(os.Getenv("XUI_OIDC_REDIRECT_URL")),
+		OIDCProviderName:     strings.TrimSpace(os.Getenv("XUI_OIDC_PROVIDER_NAME")),
+		OIDCScopes:           splitEnvList(os.Getenv("XUI_OIDC_SCOPES")),
+		OIDCAllowedEmails:    splitEnvList(os.Getenv("XUI_OIDC_ALLOWED_EMAILS")),
+	}
+	if cfg.OIDCProviderName == "" {
+		cfg.OIDCProviderName = "OpenID Connect"
+	}
+	if len(cfg.OIDCScopes) == 0 {
+		cfg.OIDCScopes = []string{"openid", "profile", "email"}
+	} else if !containsFold(cfg.OIDCScopes, "openid") {
+		cfg.OIDCScopes = append([]string{"openid"}, cfg.OIDCScopes...)
+	}
+
+	if !cfg.OIDCEnabled {
+		if !cfg.PasswordLoginEnabled {
+			return AuthConfig{}, fmt.Errorf("XUI_PASSWORD_LOGIN_ENABLED=false requires XUI_OIDC_ENABLED=true")
+		}
+		return cfg, nil
+	}
+	if cfg.OIDCIssuerURL == "" {
+		return AuthConfig{}, fmt.Errorf("XUI_OIDC_ISSUER_URL is required when OIDC is enabled")
+	}
+	if cfg.OIDCClientID == "" {
+		return AuthConfig{}, fmt.Errorf("XUI_OIDC_CLIENT_ID is required when OIDC is enabled")
+	}
+	if cfg.OIDCRedirectURL == "" {
+		return AuthConfig{}, fmt.Errorf("XUI_OIDC_REDIRECT_URL is required when OIDC is enabled")
+	}
+	redirectURL, err := url.Parse(cfg.OIDCRedirectURL)
+	if err != nil || !redirectURL.IsAbs() || (redirectURL.Scheme != "http" && redirectURL.Scheme != "https") || redirectURL.Host == "" {
+		return AuthConfig{}, fmt.Errorf("XUI_OIDC_REDIRECT_URL must be an absolute http or https URL")
+	}
+	issuerURL, err := url.Parse(cfg.OIDCIssuerURL)
+	if err != nil || !issuerURL.IsAbs() || (issuerURL.Scheme != "http" && issuerURL.Scheme != "https") || issuerURL.Host == "" {
+		return AuthConfig{}, fmt.Errorf("XUI_OIDC_ISSUER_URL must be an absolute http or https URL")
+	}
+
+	return cfg, nil
+}
+
+func (c AuthConfig) Public() PublicAuthConfig {
+	return PublicAuthConfig{
+		OIDCEnabled:          c.OIDCEnabled,
+		PasswordLoginEnabled: c.PasswordLoginEnabled,
+		OIDCProviderName:     c.OIDCProviderName,
+	}
+}
+
+func envBool(name string, fallback bool) (bool, error) {
+	raw, ok := os.LookupEnv(name)
+	if !ok || strings.TrimSpace(raw) == "" {
+		return fallback, nil
+	}
+	value, err := strconv.ParseBool(strings.TrimSpace(raw))
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean: %w", name, err)
+	}
+	return value, nil
+}
+
+func splitEnvList(raw string) []string {
+	seen := make(map[string]struct{})
+	var values []string
+	for value := range strings.FieldsFuncSeq(raw, func(r rune) bool { return r == ',' || r == ' ' || r == '\t' || r == '\n' }) {
+		value = strings.TrimSpace(value)
+		key := strings.ToLower(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		values = append(values, value)
+	}
+	return values
+}
+
+func containsFold(values []string, want string) bool {
+	for _, value := range values {
+		if strings.EqualFold(value, want) {
+			return true
+		}
+	}
+	return false
 }
 
 func GetPortOverride() (port int, configured bool, err error) {

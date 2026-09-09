@@ -397,6 +397,14 @@
   font-weight: 500;
 }
 
+.oidc-login {
+  margin-bottom: 24px;
+}
+
+.oidc-login-only {
+  margin-bottom: 0;
+}
+
 .login-form input.ant-input:-webkit-autofill,
 .login-form input.ant-input:-webkit-autofill:hover,
 .login-form input.ant-input:-webkit-autofill:focus {

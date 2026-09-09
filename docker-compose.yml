@@ -39,6 +39,13 @@ services:
       # XUI_PPROF: "true"           # expose pprof on 127.0.0.1:6060 for profiling
       # XUI_INIT_WEB_BASE_PATH: "/"
       # XUI_PORT: "8080"
+      # OIDC login (the redirect URL must match the provider registration):
+      # XUI_OIDC_ENABLED: "true"
+      # XUI_OIDC_ISSUER_URL: "https://id.example.com/realms/example"
+      # XUI_OIDC_CLIENT_ID: "3x-ui"
+      # XUI_OIDC_CLIENT_SECRET: "change-me"
+      # XUI_OIDC_REDIRECT_URL: "https://panel.example.com/oidc/callback"
+      # XUI_PASSWORD_LOGIN_ENABLED: "false"
       # To use PostgreSQL instead of the default SQLite, run:
       #   docker compose --profile postgres up -d
       # and uncomment the two lines below.

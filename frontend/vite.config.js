@@ -61,6 +61,16 @@ function readPanelVersion() {
   }
 }
 
+function readPublicAuthConfig() {
+  const oidcEnabled = process.env.XUI_OIDC_ENABLED?.trim().toLowerCase() === 'true';
+  const passwordLogin = process.env.XUI_PASSWORD_LOGIN_ENABLED?.trim().toLowerCase();
+  return {
+    oidcEnabled,
+    passwordLoginEnabled: passwordLogin !== 'false',
+    oidcProviderName: process.env.XUI_OIDC_PROVIDER_NAME?.trim() || 'OpenID Connect',
+  };
+}
+
 // `apply: 'serve'` keeps the injection out of `vite build` — dist.go
 // already injects webBasePath and version at runtime in production.
 function injectBasePathPlugin() {
@@ -71,7 +81,8 @@ function injectBasePathPlugin() {
       const basePath = refreshBasePath();
       const escaped = basePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
       const version = readPanelVersion().replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-      const tag = `<script>window.X_UI_BASE_PATH="${escaped}";window.X_UI_CUR_VER="${version}";</script>`;
+      const publicAuthConfig = JSON.stringify(readPublicAuthConfig()).replaceAll('<', '\\u003c');
+      const tag = `<script>window.X_UI_BASE_PATH="${escaped}";window.X_UI_CUR_VER="${version}";window.X_UI_AUTH_CONFIG=${publicAuthConfig};</script>`;
       return html.replace('</head>', `${tag}</head>`);
     },
   };
