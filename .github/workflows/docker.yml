@@ -1,5 +1,7 @@
 name: Release 3X-UI for Docker
 
+# Keep manual dispatch available for the first build after enabling Actions on a fork.
+
 permissions:
   contents: read
   packages: write
